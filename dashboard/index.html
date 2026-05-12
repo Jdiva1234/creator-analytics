@@ -1,0 +1,240 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creator Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 24px 16px;
+        }
+
+        header {
+            max-width: 720px;
+            margin: 0 auto 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: #94a3b8;
+            font-size: 1em;
+        }
+
+        main {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        h2 {
+            font-size: 0.85em;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 16px;
+            margin-top: 32px;
+        }
+
+        section:first-of-type h2 {
+            margin-top: 0;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 12px;
+            transition: background 0.2s;
+        }
+
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .chart-card canvas {
+            max-height: 300px;
+        }
+
+        footer {
+            max-width: 720px;
+            margin: 40px auto 0;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.85em;
+        }
+
+        .error {
+            color: #fca5a5;
+            background: rgba(252, 165, 165, 0.08);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(252, 165, 165, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Creator Analytics</h1>
+        <p>YouTube channel dashboard</p>
+    </header>
+
+    <main>
+        <section id="latest-stats">
+            <h2>Latest snapshot</h2>
+            <div class="stat-card">
+                <p class="stat-label">Subscribers</p>
+                <p class="stat-value" id="subscribers">—</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Total views</p>
+                <p class="stat-value" id="views">—</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Videos</p>
+                <p class="stat-value" id="videos">—</p>
+            </div>
+        </section>
+
+        <section id="trends">
+            <h2>Subscriber growth</h2>
+            <div class="chart-card">
+                <canvas id="growth-chart"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Built by Justice 🧡</p>
+    </footer>
+
+    <script>
+        // Configuration — your API Gateway URL goes here
+        const API_URL = 'https://durxju8sfj.execute-api.eu-west-2.amazonaws.com/stats';
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}`);
+                }
+                const data = await response.json();
+
+                if (data.length === 0) {
+                    showError('No data yet. Check back tomorrow.');
+                    return;
+                }
+
+                // Sort by date ascending (latest is last)
+                data.sort((a, b) => a.date.localeCompare(b.date));
+                const latest = data[data.length - 1];
+
+                // Populate latest stats
+                document.getElementById('subscribers').textContent =
+                    latest.subscribers.toLocaleString();
+                document.getElementById('views').textContent =
+                    latest.views.toLocaleString();
+                document.getElementById('videos').textContent =
+                    latest.videos.toLocaleString();
+
+                // Render the growth chart
+                renderChart(data);
+
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                showError('Could not load data. Check the console for details.');
+            }
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('growth-chart').getContext('2d');
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'Subscribers',
+                        data: data.map(d => d.subscribers),
+                        borderColor: '#60a5fa',
+                        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#a78bfa',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showError(message) {
+            const trends = document.querySelector('#trends .chart-card');
+            trends.innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        // Load on page load
+        loadDashboard();
+    </script>
+</body>
+</html>
