@@ -1,0 +1,71 @@
+---
+- name: Provision Sentinel — Creator Analytics health check
+  hosts: sentinel
+  become: yes
+
+  vars:
+    app_dir: /opt/sentinel
+    service_name: sentinel
+
+  tasks:
+
+    - name: Ensure Python 3 and pip are installed
+      dnf:
+        name:
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Install Python dependencies (requests, boto3)
+      pip:
+        name:
+          - requests
+          - boto3
+        executable: pip3
+        state: present
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+
+    - name: Copy the health check script
+      copy:
+        src: ../files/health_check.py
+        dest: "{{ app_dir }}/health_check.py"
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+      notify: Restart sentinel service
+
+    - name: Install the systemd service unit
+      copy:
+        src: ../files/sentinel.service
+        dest: "/etc/systemd/system/{{ service_name }}.service"
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Restart sentinel service
+
+    - name: Enable and start the sentinel service
+      systemd:
+        name: "{{ service_name }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+  handlers:
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Restart sentinel service
+      systemd:
+        name: "{{ service_name }}"
+        state: restarted
